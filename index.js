@@ -1,4 +1,6 @@
-require("http").createServer((_, res) => res.end("Berjalan coy")).listen(8080)
+require('dotenv').config()
+
+require("http").createServer((_, res) => res.end("Berjalan coy")).listen(process.env.PORT || 5000)
 
 const sessionName = 'yusril'
 const donet = 'https://saweria.co/sansekai'
