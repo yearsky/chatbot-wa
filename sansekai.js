@@ -3,7 +3,7 @@ const fs = require('fs')
 const util = require('util')
 const chalk = require('chalk')
 const { Configuration, OpenAIApi } = require("openai")
-let setting = require('./key.json')
+require('dotenv').config()
 
 module.exports = sansekai = async (client, m, chatUpdate, store) => {
     try {
@@ -24,12 +24,13 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
         const from = m.chat
         const reply = m.reply
         const sender = m.sender
+        let setting = process.env
+        const auto_ai = setting.AUTO_AI == 'false' ? false : true
         const mek = chatUpdate.messages[0]
 
         const color = (text, color) => {
             return !color ? chalk.green(text) : chalk.keyword(color)(text)
         }
-	
         // Group
         const groupMetadata = m.isGroup ? await client.groupMetadata(m.chat).catch(e => {}) : ''
         const groupName = m.isGroup ? groupMetadata.subject : ''
@@ -37,7 +38,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
         // Push Message To Console
         let argsLog = (budy.length > 30) ? `${q.substring(0, 30)}...` : budy
 
-        if (setting.autoAI) {
+        if (setting.auto_ai) {
             // Push Message To Console && Auto Read
             if (argsLog && !m.isGroup) {
             // client.sendReadReceipt(m.chat, m.sender, [m.key.id])
@@ -46,7 +47,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
             // client.sendReadReceipt(m.chat, m.sender, [m.key.id])
             console.log(chalk.black(chalk.bgWhite('[ LOGS ]')), color(argsLog, 'turquoise'), chalk.magenta('From'), chalk.green(pushname), chalk.yellow(`[ ${m.sender.replace('@s.whatsapp.net', '')} ]`), chalk.blueBright('IN'), chalk.green(groupName))
             }
-        } else if (!setting.autoAI) {
+        } else if (!setting.auto_ai) {
             if (isCmd2 && !m.isGroup) {
                 console.log(chalk.black(chalk.bgWhite('[ LOGS ]')), color(argsLog, 'turquoise'), chalk.magenta('From'), chalk.green(pushname), chalk.yellow(`[ ${m.sender.replace('@s.whatsapp.net', '')} ]`))
                 } else if (isCmd2 && m.isGroup) {
@@ -54,12 +55,12 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
                 }
         }
 
-    if (setting.autoAI) {
+    if (setting.auto_ai) {
         if (budy) {
             try {
-            if (setting.keyopenai === 'ISI_APIKEY_OPENAI_DISINI') return reply('Apikey belum diisi\n\nSilahkan isi terlebih dahulu apikeynya di file key.json\n\nApikeynya bisa dibuat di website: https://beta.openai.com/account/api-keys')
+            if (setting.OPENAI_SECRET_KEY === 'ISI_APIKEY_OPENAI_DISINI') return reply('Apikey belum diisi\n\nSilahkan isi terlebih dahulu apikeynya di file key.json\n\nApikeynya bisa dibuat di website: https://beta.openai.com/account/api-keys')
             const configuration = new Configuration({
-              apiKey: setting.keyopenai, 
+              apiKey: setting.OPENAI_SECRET_KEY, 
             });
             const openai = new OpenAIApi(configuration);
             
@@ -80,22 +81,25 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
         }
     }
 
-    if (!setting.autoAI) {
+    if (!setting.auto_ai) {
         if (isCmd2) {
             switch(command) { 
-                case 'ai':
+                case 'kai':
                     try {
-                        if (setting.keyopenai === 'ISI_APIKEY_OPENAI_DISINI') return reply('Apikey belum diisi\n\nSilahkan isi terlebih dahulu apikeynya di file key.json\n\nApikeynya bisa dibuat di website: https://beta.openai.com/account/api-keys')
-                        if (!text) return reply(`Chat dengan AI.\n\nContoh:\n${prefix}${command} Apa itu resesi`)
+                        if (setting.OPENAI_SECRET_KEY === 'ISI_APIKEY_OPENAI_DISINI') return reply('Apikey belum diisi\n\nSilahkan isi terlebih dahulu apikeynya di file key.json\n\nApikeynya bisa dibuat di website: https://beta.openai.com/account/api-keys')
+                        if (!text) return reply(`Halo ada apa?`)
                         const configuration = new Configuration({
-                            apiKey: setting.keyopenai,
+                            apiKey: setting.OPENAI_SECRET_KEY,
+                            headers: {
+                                'Authrization' : `Bearer ${setting.OPENAI_SECRET_KEY}`
+                            }
                         });
                         const openai = new OpenAIApi(configuration);
                     
                         const response = await openai.createCompletion({
                             model: "text-davinci-003",
                             prompt: text,
-                            temperature: 0.3,
+                            temperature: 0,
                             max_tokens: 3000,
                             top_p: 1.0,
                             frequency_penalty: 0.0,
