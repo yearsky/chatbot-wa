@@ -1,6 +1,6 @@
 require('dotenv').config()
 
-require("http").createServer((_, res) => res.end("Berjalan coy")).listen(process.env.PORT || 5000)
+require("http").createServer((_, res) => res.end("Berjalan coy")).listen(8080)
 
 const sessionName = 'yusril'
 const donet = 'https://saweria.co/sansekai'
@@ -123,7 +123,7 @@ function smsg(conn, m, store) {
 async function startHisoka() {
     const { version, isLatest } = await fetchLatestBaileysVersion()
 	console.log(`using WA v${version.join('.')}, isLatest: ${isLatest}`)
-    console.log(color(figlet.textSync('Wa-OpenAI', {
+    console.log(color(figlet.textSync('OpenAI', {
 		font: 'Standard',
 		horizontalLayout: 'default',
 		vertivalLayout: 'default',

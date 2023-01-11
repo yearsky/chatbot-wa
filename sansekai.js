@@ -91,7 +91,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
                         const configuration = new Configuration({
                             apiKey: setting.OPENAI_SECRET_KEY,
                             headers: {
-                                'Authrization' : `Bearer ${setting.OPENAI_SECRET_KEY}`
+                                'Authorization' : `Bearer ${setting.OPENAI_SECRET_KEY}`
                             }
                         });
                         const openai = new OpenAIApi(configuration);
