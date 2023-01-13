@@ -50,14 +50,14 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
       .split(/ +/)
       .shift()
       .toLowerCase();
-    const args = body.trim().split(/ +/);
+    const args = body.trim().split(/ +/).slice(1);
     const pushname = m.pushName || "No Name";
     const botNumber = await client.decodeJid(client.user.id);
     const doc = new GoogleSpreadsheet(
       "1T51M2Rbn0tNMXTnFbXyQUlIFWPwFf9qtSjvNdmhPNho"
     );
     const itsMe = m.sender == botNumber ? true : false;
-    let text = (q = args.slice(1).join(" "));
+    let text = (q = args.join(" "));
     const arg = budy.trim().substring(budy.indexOf(" ") + 1);
 
     const arg1 = arg.trim().substring(arg.indexOf(" ") + 1);
@@ -177,6 +177,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
                 frequency_penalty: 0.0,
                 presence_penalty: 0.0,
               });
+              console.log(response)
               m.reply(`${response.data.choices[0].text}\n\n`);
             } catch (err) {
               console.log(err);
@@ -221,7 +222,6 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
     }
 
     if (txtCmd) {
-      
       let getDateText = lowerBudyText
         .replace(/ /g, "")
         .replace("listtugas,", "");
