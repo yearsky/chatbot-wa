@@ -221,11 +221,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
     }
 
     if (txtCmd) {
-      if (lowerBudyText.match('input'))
-      {
-        m.reply(`Aduhh maaf yaa kak, kai kurang satu bab untuk pelajarin fitur ini.. kai kabarin besok ya😬`)
-        return false;
-      }
+      
       let getDateText = lowerBudyText
         .replace(/ /g, "")
         .replace("listtugas,", "");
