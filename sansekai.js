@@ -231,7 +231,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
         try {
           await doc.useServiceAccountAuth({
             client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY,
+            private_key: process.env.GOOGLE_PRIVATE_KEY.split(String.raw`\n`).join('\n'),
           });
 
           await doc.loadInfo(); // loads document properties and worksheets
