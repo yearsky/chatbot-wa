@@ -30,6 +30,7 @@
     "dotenv": "^16.0.3",
     "figlet": "^1.5.2",
     "fs": "0.0.1-security",
+    "google-spreadsheet": "^3.3.0",
     "lodash": "^4.17.21",
     "openai": "^3.1.0",
     "pino": "^7.0.5",

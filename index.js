@@ -3,8 +3,6 @@ require('dotenv').config()
 require("http").createServer((_, res) => res.end("Berjalan coy")).listen(8080)
 
 const sessionName = 'yusril'
-const donet = 'https://saweria.co/sansekai'
-const owner = ['6287878817169']
 const { default: sansekaiConnect, useSingleFileAuthState, DisconnectReason, fetchLatestBaileysVersion, generateForwardMessageContent, prepareWAMessageMedia, generateWAMessageFromContent, generateMessageID, downloadContentFromMessage, makeInMemoryStore, jidDecode, proto, getContentType } = require("@adiwajshing/baileys")
 const { state, saveState } = useSingleFileAuthState(`./${sessionName}.json`)
 const pino = require('pino')
@@ -236,7 +234,6 @@ async function startHisoka() {
             else { console.log(`Unknown DisconnectReason: ${reason}|${connection}`); startHisoka(); }
         } else if(connection === 'open') {
             console.log('Bot conneted to server')
-            client.sendMessage(owner+'@s.whatsapp.net', { text: `Bot started!\n\njangan lupa support ya bang :)\n${donet}` })
         }
         // console.log('Connected...', update)
     })
