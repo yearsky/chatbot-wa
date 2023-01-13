@@ -186,7 +186,7 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
             break;
           case "help":
             try {
-              const txt = `*Saya bisa memberikan informasi terkait:*\n\n 1. Jadwal Tugas Multimedia 😏\n\n Contoh: Tugas 5 February 2023.\n\n 2. Input Jadwal Tugas 📝\n Contoh: Input Tugas {nama} {Tanggal} \n\n 3. Bible 📃 \n Contoh: Alkitab,Kej 1\n\n 4. Bisa jadi teman kamu😎 \n\n "Saat kesepian menghampiri, jangan merasa sendiri. Aku bisa menjadi teman baikmu yang akan mendengarkan, memahami, dan memberikan dukungan dalam setiap kondisi. Bersama kita akan mengatasi kesepian dan membuat hidupmu lebih bermakna 🤜🤛." \n\nPanggil aku dengan *#kai* maka aku akan menjawab semua pertanyaan kamu\n\n Contoh: #kai cara mempunyai pasangan agar tidak kesepian`;
+              const txt = `*Saya bisa memberikan informasi terkait:*\n\n 1. Jadwal Tugas Multimedia 😏\n\n Contoh: Tugas 5 February 2023.\n\n 2. Input Jadwal Tugas(On Going) 📝\n Contoh: Input Tugas {nama} {Tanggal} \n\n 3. Bible(On Going) 📃 \n Contoh: Alkitab,Kej 1\n\n 4. Bisa jadi teman kamu😎 \n\n "Saat kesepian menghampiri, jangan merasa sendiri. Aku bisa menjadi teman baikmu yang akan mendengarkan, memahami, dan memberikan dukungan dalam setiap kondisi. Bersama kita akan mengatasi kesepian dan membuat hidupmu lebih bermakna 🤜🤛." \n\nPanggil aku dengan *#kai* maka aku akan menjawab semua pertanyaan kamu\n\n Contoh: #kai cara mempunyai pasangan agar tidak kesepian`;
               return reply(txt);
             } catch (err) {
               console.log(err);
