@@ -231,18 +231,20 @@ module.exports = sansekai = async (client, m, chatUpdate, store) => {
         try {
           await doc.useServiceAccountAuth({
             client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY.split(String.raw`\n`).join('\n'),
+            private_key: process.env.GOOGLE_PRIVATE_KEY,
           });
 
           await doc.loadInfo(); // loads document properties and worksheets
           const sheet = doc.sheetsByIndex[0];
           const rows = await sheet.getRows();
           const fmDate = formatDate(getDateText);
+
           let filter_data = rows.filter((el) => {
             return formatDate(el.Tanggal) == fmDate;
           });
 
-          if (filter_data.length === "") {
+          console.log(filter_data)
+          if (filter_data.length === 0) {
             m.reply(`🤖 : Beep,beep data tidak ditemukan!`);
             return false;
           }
