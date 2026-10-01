@@ -201,7 +201,7 @@ Kasus lain:
 
 ## 6. Di luar cakupan versi pertama (kandidat fase 2)
 
-- **Interval dalam rentang jam**, mis. "setiap 30 menit dari 07:20 sampai 17:00". Ini bisa ditambah sebagai `schedule.every` + `schedule.until` jika memang dibutuhkan.
+- **Interval dalam rentang jam**, mis. "setiap 30 menit dari 07:20 sampai 17:00". Ini bisa ditambah sebagai `schedule.every` + `schedule.until` jika memang dibutuhkan. (Bukan kebutuhan saat ini: sudah diputuskan cukup dua kiriman per hari.)
 - **Libur nasional / cuti**: `/skip <id> besok` atau `/pause <id> sampai 10/10`, lalu `/resume <id>`.
 - **Edit jadwal** tanpa hapus-buat ulang: `/edit <id> jam 07:30,17:00`.
 - **Tanggal berakhir**: `... sampai 31/12`.
@@ -209,7 +209,7 @@ Kasus lain:
 
 ## 7. Pertanyaan terbuka
 
-1. **Interpretasi jam.** Planning ini mengasumsikan "jam 7.20 dan sore 17.00" berarti **dua kiriman** per hari. Jika yang dimaksud adalah *rentang* 07:20–17:00 dengan kiriman berulang tiap N menit, item interval di bagian 6 perlu dinaikkan ke versi pertama.
+1. ~~**Interpretasi jam.**~~ ✅ **Diputuskan:** "jam 7.20 dan sore 17.00" berarti **dua kiriman per hari** (07:20 dan 17:00), bukan kiriman berulang tiap N menit di antara kedua jam itu. Mode interval tetap di fase 2.
 2. **Isi pesan pagi & sore**: sama (satu reminder) atau berbeda (dua reminder)? Keduanya didukung oleh desain ini.
 3. **Batas keterlambatan**: kalau bot baru nyala jauh setelah jadwal, apakah reminder tetap dikirim dengan label "terlambat" (perilaku sekarang) atau dilewati bila terlambat lebih dari, misalnya, 60 menit?
 4. **Hari libur nasional**: perlu di versi pertama, atau cukup `/skip` manual nanti?
