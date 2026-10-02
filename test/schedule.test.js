@@ -25,6 +25,7 @@ test('parseDays: rentang, singkatan, alias, daftar', () => {
   assert.deepEqual(parseDays("jum'at"), [5])
   assert.deepEqual(parseDays('jumat-senin'), [1, 5, 6, 7]) // melewati Minggu
   assert.deepEqual(parseDays('senin-rabu,jumat'), [1, 2, 3, 5])
+  assert.deepEqual(parseDays('senin\u2013jumat'), [1, 2, 3, 4, 5])
   assert.equal(parseDays('besok'), null)
   assert.equal(parseDays('senin-xyz'), null)
   assert.equal(parseDays('senin,'), null)

@@ -31,12 +31,28 @@ const DAY_ALIASES = {
 
 const pad = (n) => String(n).padStart(2, '0')
 
+// Keyboard HP sering mengganti "-" menjadi "–" atau "—" (autocorrect).
+const DASH = String.raw`[-\u2010-\u2015\u2212]`
+const DASHES = new RegExp(DASH, 'g')
+export function normalizeDashes(text) {
+  return String(text || '').replace(DASHES, '-')
+}
+
+// Rapikan rentang hari di awal teks: "senin - jumat", "senin – jumat", "senin sampai jumat" → "senin-jumat".
+const DAY_RANGE_PREFIX = new RegExp(
+  String.raw`^([\p{L}']+)(?:\s*${DASH}\s*|\s+(?:sampai|s/d|sd|hingga)\s+)([\p{L}']+)(?=\s|$)`,
+  'iu'
+)
+export function normalizeDayRange(text) {
+  return String(text || '').trim().replace(DAY_RANGE_PREFIX, '$1-$2')
+}
+
 /**
  * "senin-jumat", "sen-jum", "hari-kerja", "senin,rabu,jumat", "jumat-senin", "sabtu".
  * @returns {number[] | null} nomor hari terurut (1 = Senin), atau null bila bukan ekspresi hari.
  */
 export function parseDays(token) {
-  const input = String(token || '').toLowerCase()
+  const input = normalizeDashes(token).toLowerCase()
   if (DAY_ALIASES[input]) return [...DAY_ALIASES[input]]
   const days = new Set()
   for (const part of input.split(',')) {
@@ -63,7 +79,7 @@ export function parseDays(token) {
 
 // Pemisah antar jam: koma, strip, "&", atau "dan". Contoh: "07:20,17:00", "7.20 dan 17.00".
 const TIME = String.raw`\d{1,2}[:.]\d{2}`
-const SEP = String.raw`\s*(?:,|-|&|\bdan\b)\s*`
+const SEP = String.raw`\s*(?:,|${DASH}|&|\bdan\b)\s*`
 const TIMES_PREFIX = new RegExp(`^(${TIME}(?:${SEP}${TIME})*)(?:\\s+|$)`, 'i')
 
 /**

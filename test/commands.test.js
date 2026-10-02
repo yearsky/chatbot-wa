@@ -44,6 +44,28 @@ test('/remind terjadwal: <hari> <jam,jam> <teks>', () => {
   assert.equal(parseCommand('/remind besok 09:00 x', NOW, TZ).intent.repeat, 'none')
 })
 
+test('/remind terjadwal: toleran terhadap autocorrect keyboard HP', () => {
+  const variants = [
+    '/remind senin\u2013jumat 07:20,17:00 absen', // en dash
+    '/remind senin\u2014jumat 07:20,17:00 absen', // em dash
+    '/remind Senin - Jumat 07:20,17:00 absen',
+    '/remind senin sampai jumat 07:20,17:00 absen',
+    '/remind senin s/d jumat 07:20, 17:00 absen',
+    '/remind senin-jumat 07:20\u201317:00 absen' // en dash di antara jam
+  ]
+  for (const v of variants) {
+    const r = parseCommand(v, NOW, TZ)
+    assert.ok(r.intent, `${v} → ${r.error}`)
+    assert.deepEqual(r.intent.schedule, { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] })
+    assert.equal(r.intent.text, 'absen')
+  }
+  // Teks reminder tidak ikut diubah
+  assert.equal(parseCommand('/remind senin-jumat 07:20 absen \u2013 pagi', NOW, TZ).intent.text, 'absen \u2013 pagi')
+  // Format lama tidak terpengaruh
+  assert.equal(parseCommand('/remind 10m tes', NOW, TZ).intent.repeat, 'none')
+  assert.ok(parseCommand('/remind kapan-kapan x', NOW, TZ).error)
+})
+
 test('/done, /del, perintah tak dikenal', () => {
   assert.deepEqual(parseCommand('/done #3', NOW, TZ).intent, { action: 'done', id: 3 })
   assert.deepEqual(parseCommand('/del 4', NOW, TZ).intent, { action: 'delete', id: 4 })
