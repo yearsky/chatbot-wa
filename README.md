@@ -9,7 +9,7 @@ Bot WhatsApp pribadi untuk **reminder** dan **catatan**, dijalankan dari termina
   - **OpenAI API**: pakai API key (bayar per pemakaian)
   - **Tanpa AI**: hanya perintah `/...`
 - Bot hanya melayani **nomor pemilik**.
-- Data disimpan lokal di `data/db.json`.
+- **Memory bank SQLite** di `data/assistant.db` (modul bawaan Node, tanpa instalasi tambahan): catatan & konteks penting diindeks FTS5, dan yang relevan dengan pesanmu otomatis diberikan ke AI, jadi kamu bisa tanya "nomor meja aku berapa?". Cari manual dengan `/cari <kata kunci>`. Data lama `data/db.json` dipindahkan otomatis saat start pertama.
 
 ## Kebutuhan
 
@@ -66,29 +66,18 @@ Jika bot login di **nomormu sendiri**, pakai chat **"Kirim pesan ke diri sendiri
 /remind 5/10 14:00 rapat
 /remind harian 07:00 minum obat
 /remind mingguan besok 08:00 kerja bakti
-/remind senin-jumat 07:20,17:00 absen   → tiap Senin–Jumat jam 07:20 & 17:00
-/remind weekend 08:00 siram tanaman
+/remind senin-jumat 07:20,17:00 absen   → Sen–Jum, dua kali sehari
+/remind sabtu,minggu 08:00 siram tanaman
 /reminders                    → lihat reminder aktif
 /done 3                       → hentikan/selesaikan reminder #3
 /del 2                        → hapus catatan/reminder #2
-/help
+/help                         → daftar perintah lengkap dengan contoh
 ```
 
+Hari: `senin-jumat`, `sen-jum`, `senin sampai jumat`, `senin,rabu,jumat`, `hari-kerja`, `weekend`, `setiap-hari`.
+Beberapa jam dipisah koma, strip, `&`, atau `dan`, jadi `07:20-17:00` berarti dua kiriman (07:20 dan 17:00).
+
 Format waktu: `10m`, `2h`, `1h30m`, `1d`, `07:00`, `besok 09:00`, `lusa 8.30`, `5/10 14:00`, `2026-10-05 14:00`.
-
-### Reminder terjadwal (hari & jam tetap)
-
-Format: `/remind <hari> <jam,jam,...> <teks>`
-
-- **Hari**: `senin-jumat`, `sen-jum`, `hari-kerja`, `weekend`, `setiap-hari`, `senin,rabu,jumat`, atau satu hari (`senin`). Rentang boleh melewati Minggu, mis. `jumat-senin`. Penulisan `senin - jumat`, `senin – jumat` (strip dari autocorrect HP) dan `senin sampai jumat` juga diterima.
-- **Jam**: satu atau beberapa jam, dipisah `,`, `-` atau `dan`. Contoh `07:20,17:00` atau `7.20-17.00`. Keduanya berarti **dua kiriman** (07:20 dan 17:00), bukan kiriman berulang di antara dua jam itu.
-- Satu reminder = satu ID untuk semua jam. `/done <id>` menghentikan seluruh jadwal.
-- Jika pesan pagi dan sore berbeda, buat dua reminder:
-  ```
-  /remind senin-jumat 07:20 absen masuk
-  /remind senin-jumat 17:00 absen pulang
-  ```
-- Lewat AI juga bisa: *"ingatkan aku absen tiap senin sampai jumat jam 7.20 dan jam 5 sore"*.
 
 ### Bahasa bebas (pakai AI)
 
@@ -101,9 +90,24 @@ hapus catatan soal wifi
 
 AI hanya menerjemahkan pesan menjadi aksi (JSON). Penyimpanan dan penjadwalan dikerjakan oleh kode bot, jadi balasan konfirmasi selalu berasal dari data yang benar-benar tersimpan.
 
+Dengan Claude Code CLI, bot menjaga **satu proses Claude tetap menyala** agar balasan cepat (±2–4 detik setelah hangat, dibanding 5–15 detik bila Claude dinyalakan ulang tiap pesan). Proses diganti baru setiap `claudeMaxTurns` pesan (default 10, bisa diubah di `config.json`) supaya riwayatnya tidak menumpuk.
+
+### Pencarian Atlassian lewat MCP (opsional)
+
+```
+/atlassian sync kas
+/atlassian bug login mobile banking
+```
+
+Bot menjalankan Claude Code dengan server MCP Atlassian milikmu, lalu mengirim ringkasan hasil pencarian Jira/Confluence ke WhatsApp. Aktifkan di `npm run setup`: tunjuk file MCP config yang berisi server tersebut (mis. `D:\nds\.mcp.json`) dan nama servernya.
+
+- **Hanya baca.** Yang diizinkan hanya tool cari/baca Jira & Confluence. Tool yang mengubah data (create/update/delete/transition/comment, dsb.) dan semua tool bawaan Claude Code (baca file, Bash, dsb.) diblokir. Daftarnya bisa dilihat/diubah di `config.json` → `mcpCommands.atlassian`.
+- **Bot tidak membaca isi file MCP config**; path-nya langsung diteruskan ke `claude --mcp-config`.
+- Butuh Claude Code CLI terpasang, apa pun provider AI utamanya. Satu pencarian biasanya 15–30 detik.
+
 ## Supaya jalan 24/7 di komputer sendiri
 
-- Reminder hanya terkirim saat bot menyala. Jika komputer mati, reminder yang terlewat dikirim saat bot dinyalakan lagi (ditandai "terlambat"). Untuk reminder berulang/terjadwal, hanya **satu** kiriman terlambat yang dikirim, lalu jadwal lanjut ke jam berikutnya.
+- Reminder hanya terkirim saat bot menyala. Jika komputer mati, reminder yang terlewat dikirim saat bot dinyalakan lagi (ditandai "terlambat").
 - Matikan mode sleep: **Settings → System → Power → Screen and sleep → Never** (Windows).
 - Agar otomatis jalan saat login Windows, buat file `start-bot.bat`:
   ```bat
@@ -123,10 +127,10 @@ src/wa.js          koneksi WhatsApp (Baileys), QR, filter pemilik
 src/assistant.js   router perintah / AI
 src/commands.js    parser perintah /...
 src/scheduler.js   pengirim reminder
-src/schedule.js    jadwal hari & jam (senin-jumat 07:20,17:00)
-src/db.js          penyimpanan JSON
+src/db.js          memory bank SQLite (FTS5) untuk catatan & reminder
 src/time.js        parsing & format waktu
-src/ai/            provider: claudeCli, codexCli, openaiApi
+src/ai/            provider: claudeCli (+ claudeSession: proses persisten), codexCli, openaiApi
+src/ai/mcpQuery.js perintah MCP (/atlassian)
 ```
 
 File lokal yang **tidak** di-commit: `config.json`, `.env`, `auth/` (sesi WhatsApp), `data/`.
@@ -136,3 +140,4 @@ File lokal yang **tidak** di-commit: `config.json`, `.env`, `auth/` (sesi WhatsA
 - **Library tidak resmi.** Bot memakai [Baileys](https://github.com/WhiskeySockets/Baileys), klien WhatsApp Web tidak resmi. WhatsApp bisa membatasi atau memblokir nomor yang memakai klien tidak resmi. Pakai nomor kedua jika memungkinkan.
 - **Ketentuan layanan AI.** Memakai Claude Code / Codex CLI dengan akun langganan untuk otomasi seperti ini bisa terkena batas pemakaian atau aturan penggunaan yang berubah dari waktu ke waktu. Cek sendiri ketentuan terbaru dari Anthropic dan OpenAI. Setiap pesan non-perintah memakai kuota langganan. Pakai perintah `/...` untuk menghemat kuota.
 - **Rahasia.** Folder `auth/` berisi sesi WhatsApp dan `.env` berisi API key. Jangan dibagikan atau di-commit.
+- **Data kantor ke WhatsApp.** `/atlassian` mengirim isi Jira/Confluence ke chat WhatsApp (dan ke HP/perangkat tertaut). Pastikan ini sesuai kebijakan keamanan data di tempat kerjamu sebelum mengaktifkannya.

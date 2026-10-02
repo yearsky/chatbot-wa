@@ -1,7 +1,8 @@
 // Menjalankan CLI (claude / codex) sebagai subprocess, lintas platform.
 // Prompt selalu dikirim lewat stdin agar tidak ada masalah quoting di cmd/PowerShell.
 
-import { spawn } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
+import fs from 'node:fs'
 
 const IS_WINDOWS = process.platform === 'win32'
 
@@ -13,17 +14,36 @@ function quoteWinArg(arg) {
   return `"${arg.replace(/"/g, '""')}"`
 }
 
+export function spawnCli(bin, args, { cwd } = {}) {
+  // spawn melempar ENOENT (mirip "perintah tidak ditemukan") jika cwd belum ada.
+  if (cwd) fs.mkdirSync(cwd, { recursive: true })
+  return spawn(IS_WINDOWS ? quoteWinArg(bin) : bin, IS_WINDOWS ? args.map(quoteWinArg) : args, {
+    cwd,
+    shell: IS_WINDOWS,
+    windowsHide: true,
+    env: process.env
+  })
+}
+
+// Di Windows child.kill() hanya mematikan cmd.exe, bukan proses claude/codex di bawahnya.
+export function killTree(child) {
+  if (!child || child.exitCode !== null || child.killed) return
+  if (IS_WINDOWS && child.pid) {
+    spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' })
+  } else {
+    child.kill()
+  }
+}
+
+export function spawnErrorMessage(bin, err) {
+  return err.code === 'ENOENT' ? `Perintah "${bin}" tidak ditemukan. Sudah diinstal?` : err.message
+}
+
 export function runCli(bin, args, { input = '', timeoutMs = 120000, cwd } = {}) {
   return new Promise((resolve, reject) => {
-    const finalArgs = IS_WINDOWS ? args.map(quoteWinArg) : args
     let child
     try {
-      child = spawn(IS_WINDOWS ? quoteWinArg(bin) : bin, finalArgs, {
-        cwd,
-        shell: IS_WINDOWS,
-        windowsHide: true,
-        env: process.env
-      })
+      child = spawnCli(bin, args, { cwd })
     } catch (err) {
       reject(err)
       return
@@ -40,16 +60,13 @@ export function runCli(bin, args, { input = '', timeoutMs = 120000, cwd } = {}) 
     }
 
     const timer = setTimeout(() => {
-      child.kill()
+      killTree(child)
       finish(reject, new Error(`${bin} tidak merespons dalam ${Math.round(timeoutMs / 1000)} detik`))
     }, timeoutMs)
 
     child.stdout.on('data', (d) => (stdout += d))
     child.stderr.on('data', (d) => (stderr += d))
-    child.on('error', (err) => {
-      const msg = err.code === 'ENOENT' ? `Perintah "${bin}" tidak ditemukan. Sudah diinstal?` : err.message
-      finish(reject, new Error(msg))
-    })
+    child.on('error', (err) => finish(reject, new Error(spawnErrorMessage(bin, err))))
     child.on('close', (code) => {
       if (code === 0) finish(resolve, { stdout, stderr })
       else {

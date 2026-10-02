@@ -5,32 +5,53 @@ import { parseWhen } from './time.js'
 import { nextScheduledOccurrence, normalizeDayRange, parseDays, parseTimesPrefix } from './schedule.js'
 
 export const HELP_TEXT = `*Asisten Pribadi* 🤖
+Perintah diawali "/". Pesan tanpa "/" dibaca AI (jika diaktifkan).
 
-*Catatan*
-/note <teks> — simpan catatan
-/notes — lihat semua catatan
+*📝 Catatan (memory bank)*
+/note <teks> — simpan catatan atau info penting
+   /note nomor meja kantor 12
+/notes — tampilkan semua catatan
+/cari <kata kunci> — cari di catatan
+   /cari meja
 
-*Reminder*
-/remind <waktu> <teks> — buat reminder
-/remind harian <jam> <teks> — reminder setiap hari
-/remind mingguan <waktu> <teks> — reminder setiap minggu
-/remind <hari> <jam,jam> <teks> — reminder terjadwal, mis.
+*⏰ Reminder sekali*
+/remind <waktu> <teks>
+   /remind 30m angkat jemuran
+   /remind besok 09:00 bayar listrik
+   /remind 5/10 14:00 rapat
+
+*🔁 Reminder berulang*
+/remind harian <jam> <teks> — setiap hari
+   /remind harian 07:00 minum obat
+/remind mingguan <waktu> <teks> — setiap minggu, mulai dari waktu itu
+   /remind mingguan besok 08:00 kerja bakti
+/remind <hari> <jam> <teks> — hari tertentu, boleh beberapa jam
    /remind senin-jumat 07:20,17:00 absen
-/reminders — lihat reminder aktif
-/done <id> — tandai reminder selesai
+   /remind senin sampai jumat 07:20 dan 17:00 absen
+   /remind sabtu,minggu 08:00 siram tanaman
+_Beberapa jam dipisah koma, strip, "&", atau "dan". Jadi 07:20-17:00 artinya dua kiriman (07:20 dan 17:00), bukan setiap jam di antaranya._
 
-*Lainnya*
-/del <id> — hapus catatan/reminder
-/help — bantuan ini
+*📋 Kelola reminder*
+/reminders — lihat reminder aktif beserta ID-nya
+/done <id> — tandai selesai; reminder berulang berhenti diulang
+/del <id> — hapus catatan atau reminder
 
-*Format waktu*
-10m · 2h · 1h30m · 1d · 07:00 · besok 09:00 · lusa 8.30 · 5/10 14:00 · 2026-10-05 14:00
+*🕒 Format waktu*
+Durasi: 10m · 2h · 1h30m · 1d · 15menit · 2jam
+Jam saja: 07:00 atau 7.30 (hari ini, atau besok kalau sudah lewat)
+Hari: hari ini 13:00 · besok 09:00 · lusa 8.30
+Tanggal: 5/10 14:00 · 5/10/2026 14:00 · 2026-10-05 14:00
 
-*Format hari*
-senin-jumat · sen-jum · hari-kerja · weekend · setiap-hari · senin,rabu,jumat
+*📅 Format hari*
+senin-jumat · sen-jum · jumat-senin
+senin,rabu,jumat · sabtu
+hari-kerja · weekend · setiap-hari
 
-Tanpa "/" pesanmu dibaca oleh AI (jika diaktifkan), contoh:
-"ingatkan aku besok jam 7 pagi olahraga"`
+*💬 Bahasa bebas (AI)*
+"ingatkan aku besok jam 7 pagi olahraga"
+"ingatkan absen tiap senin sampai jumat jam 7.20 dan jam 5 sore"
+"ingat ya, nomor meja kantorku 12"
+"nomor meja aku berapa?"`
 
 const REPEAT_WORDS = { harian: 'daily', daily: 'daily', mingguan: 'weekly', weekly: 'weekly' }
 
@@ -65,10 +86,14 @@ export function parseCommand(text, now, tz) {
     case 'catatan':
       return { intent: { action: 'list_notes' } }
 
+    case 'cari':
+    case 'search':
+      if (!rest) return { error: 'Format: /cari <kata kunci>' }
+      return { intent: { action: 'search_notes', text: rest } }
+
     case 'remind':
     case 'ingatkan': {
       if (!rest) return { error: 'Format: /remind <waktu> <teks>\nContoh: /remind 30m angkat jemuran' }
-      const [first, ...others] = rest.split(/\s+/)
 
       // Reminder terjadwal: /remind senin-jumat 07:20,17:00 absen
       const [dayToken, ...afterDays] = normalizeDayRange(rest).split(/\s+/)
@@ -86,6 +111,7 @@ export function parseCommand(text, now, tz) {
 
       let repeat = 'none'
       let body = rest
+      const [first, ...others] = rest.split(/\s+/)
       if (REPEAT_WORDS[first.toLowerCase()]) {
         repeat = REPEAT_WORDS[first.toLowerCase()]
         body = others.join(' ')

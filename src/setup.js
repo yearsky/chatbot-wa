@@ -1,10 +1,14 @@
 // Wizard setup interaktif di terminal (cmd / PowerShell / bash).
 
+import fs from 'node:fs'
+import path from 'node:path'
 import chalk from 'chalk'
 import { confirm, input, password, select } from '@inquirer/prompts'
 import { PROVIDERS, createAi } from './ai/index.js'
 import { cliVersion } from './ai/cli.js'
+import { ATLASSIAN_PRESET, writeHttpMcpConfig } from './ai/mcpQuery.js'
 import { listOpenAiModels } from './ai/openaiApi.js'
+import { buildPrompt, extractJson, validateIntent } from './ai/prompt.js'
 import { DEFAULTS, PATHS, isSafeModelName, normalizePhone, saveConfig, setEnvVar } from './config.js'
 import { isValidTimezone } from './time.js'
 
@@ -127,13 +131,20 @@ export async function runSetup(existing) {
     })
   )
 
+  const ownerName = await input({
+    message: 'Nama panggilanmu (dipakai bot saat menyapa, boleh kosong):',
+    default: prev.ownerName || undefined
+  }).then((v) => v.trim())
+
   const timezone = await input({
     message: 'Zona waktu (IANA):',
     default: prev.timezone,
     validate: (v) => isValidTimezone(v.trim()) || 'Zona waktu tidak dikenal, contoh: Asia/Jakarta, Asia/Makassar, Asia/Jayapura'
   }).then((v) => v.trim())
 
-  const config = { ...prev, provider, model, ownerNumber, timezone }
+  const mcpCommands = await askMcp(prev)
+
+  const config = { ...prev, provider, model, ownerNumber, ownerName, timezone, mcpCommands }
   saveConfig(config)
   console.log(chalk.green(`\n✔ Konfigurasi disimpan ke ${PATHS.config}`))
 
@@ -143,12 +154,111 @@ export async function runSetup(existing) {
   return config
 }
 
+/**
+ * Terima path file .mcp.json, folder yang berisi .mcp.json, atau URL server MCP HTTP.
+ * @returns {{ mcpConfig?: string, url?: string, error?: string }}
+ */
+export function resolveMcpLocation(raw) {
+  const value = String(raw || '').trim().replace(/^"(.*)"$/, '$1')
+  if (!value) return { error: 'Wajib diisi' }
+  if (/^https?:\/\//i.test(value)) {
+    try {
+      return { url: new URL(value).toString() }
+    } catch {
+      return { error: 'URL tidak valid' }
+    }
+  }
+  const full = path.resolve(value)
+  if (!fs.existsSync(full)) return { error: 'File atau folder tidak ditemukan' }
+  if (fs.statSync(full).isDirectory()) {
+    const inside = path.join(full, '.mcp.json')
+    if (fs.existsSync(inside)) return { mcpConfig: inside }
+    return { error: 'Itu folder, bukan file config. Isi dengan file .mcp.json, mis. D:\\nds\\.mcp.json' }
+  }
+  return { mcpConfig: full }
+}
+
+// Perintah /atlassian lewat MCP. Bot tidak membaca isi file .mcp.json; path-nya diteruskan ke Claude Code.
+async function askMcp(prev) {
+  const mcpCommands = { ...(prev.mcpCommands || {}) }
+  const existing = mcpCommands.atlassian
+  if (!(await cliVersion(prev.claudeBin || 'claude'))) {
+    if (existing) console.log(chalk.yellow('Claude Code CLI tidak terdeteksi, /atlassian tidak akan berfungsi.'))
+    return mcpCommands
+  }
+
+  const enable = await confirm({
+    message: 'Aktifkan perintah /atlassian (cari Jira, Confluence & Bitbucket lewat MCP, hanya baca)?',
+    default: Boolean(existing)
+  })
+  if (!enable) {
+    delete mcpCommands.atlassian
+    return mcpCommands
+  }
+
+  console.log(
+    chalk.gray(
+      'Isi dengan FILE .mcp.json yang mendaftarkan server Atlassian (mode stdio, mis. D:\\nds\\.mcp.json),\n' +
+        'atau URL bila server Atlassian dijalankan terpisah dalam mode HTTP (mis. http://127.0.0.1:9999/mcp).'
+    )
+  )
+  const location = resolveMcpLocation(
+    await input({
+      message: 'File MCP config atau URL server Atlassian:',
+      default: existing?.url || existing?.mcpConfig,
+      validate: (v) => resolveMcpLocation(v).error ?? true
+    })
+  )
+
+  let mcpConfig = location.mcpConfig
+  let server
+  if (location.url) {
+    // Mode HTTP: buat file config kecil berisi URL saja (tanpa rahasia).
+    server = ATLASSIAN_PRESET.server
+    mcpConfig = path.join(PATHS.data, `mcp-${server}.json`)
+    writeHttpMcpConfig(mcpConfig, server, location.url)
+    console.log(chalk.gray(`Config MCP HTTP dibuat: ${mcpConfig}`))
+  } else {
+    server = await input({
+      message: 'Nama server di file itu (kunci di "mcpServers", bukan URL):',
+      default: existing?.server || ATLASSIAN_PRESET.server,
+      validate: (v) => /^[\w-]+$/.test(v.trim()) || 'Hanya huruf, angka, _ dan - (contoh: atlassian)'
+    }).then((v) => v.trim())
+  }
+
+  // Tool baru di preset (mis. Bitbucket) ikut ditambahkan ke config lama; tambahan manual tetap dipertahankan.
+  const union = (a = [], b = []) => [...new Set([...a, ...b])]
+  mcpCommands.atlassian = {
+    ...ATLASSIAN_PRESET,
+    ...existing,
+    label: ATLASSIAN_PRESET.label,
+    allowedTools: union(existing?.allowedTools, ATLASSIAN_PRESET.allowedTools),
+    deniedTools: union(existing?.deniedTools, ATLASSIAN_PRESET.deniedTools),
+    mcpConfig,
+    server,
+    url: location.url
+  }
+  if (!location.url) delete mcpCommands.atlassian.url
+  console.log(chalk.gray(`Tool yang diizinkan (hanya baca): ${mcpCommands.atlassian.allowedTools.join(', ')}`))
+  return mcpCommands
+}
+
 export async function testAi(config) {
   try {
-    const ai = createAi(config, { cwd: PATHS.data })
+    // Mode sekali jalan: tidak meninggalkan proses Claude yang menyala setelah setup.
+    const ai = createAi(config, { cwd: PATHS.data, persistent: false })
     process.stdout.write(chalk.gray(`Menghubungi ${ai.name}... `))
-    const out = await ai.complete('Balas hanya dengan JSON persis ini: {"ok": true}')
-    console.log(/"ok"\s*:\s*true/.test(out) ? chalk.green('berhasil ✔') : chalk.yellow(`respons tak terduga: ${out.slice(0, 200)}`))
+    // Tes memakai prompt yang sama dengan pesan WhatsApp sungguhan.
+    const now = new Date()
+    const out = await ai.complete(buildPrompt({ message: 'catat: tes koneksi', now, tz: config.timezone }))
+    let parsed = null
+    try {
+      parsed = validateIntent(extractJson(out), now)
+    } catch {
+      // ditangani di bawah
+    }
+    if (parsed?.ok && parsed.intent.action === 'add_note') console.log(chalk.green('berhasil ✔'))
+    else console.log(chalk.yellow(`respons tak terduga: ${out.slice(0, 300)}`))
   } catch (err) {
     console.log(chalk.red(`gagal ✖\n${err.message}`))
   }

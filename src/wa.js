@@ -74,7 +74,8 @@ export function startWhatsApp({ authDir, ownerNumber, onMessage, log }) {
       version,
       auth: state,
       logger: pino({ level: 'silent' }),
-      browser: Browsers.appropriate('Desktop'),
+      // Identitas "Desktop" ditolak server saat pairing QR (kode 428); "Chrome" diterima.
+      browser: process.platform === 'win32' ? Browsers.windows('Chrome') : Browsers.ubuntu('Chrome'),
       markOnlineOnConnect: false,
       syncFullHistory: false
     })

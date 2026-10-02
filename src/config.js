@@ -13,15 +13,22 @@ export const PATHS = {
   env: path.join(HOME, '.env'),
   auth: path.join(HOME, 'auth'),
   data: path.join(HOME, 'data'),
-  db: path.join(HOME, 'data', 'db.json')
+  db: path.join(HOME, 'data', 'assistant.db'),
+  // Penyimpanan lama (sebelum SQLite); dimigrasikan otomatis saat pertama start.
+  legacyDb: path.join(HOME, 'data', 'db.json')
 }
 
 export const DEFAULTS = {
   provider: 'claude-cli',
   model: '',
   ownerNumber: '',
+  ownerName: '',
   timezone: 'Asia/Jakarta',
-  aiTimeoutMs: 120000
+  aiTimeoutMs: 120000,
+  // Proses Claude yang terus menyala diganti baru setiap N pesan (lihat src/ai/claudeSession.js).
+  claudeMaxTurns: 10,
+  // Perintah berbasis MCP, mis. { atlassian: { mcpConfig, server, label, allowedTools, deniedTools } }
+  mcpCommands: {}
 }
 
 export function loadConfig() {

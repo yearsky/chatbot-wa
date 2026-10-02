@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { parseCommand } from '../src/commands.js'
+import { HELP_TEXT, parseCommand } from '../src/commands.js'
 
 const TZ = 'Asia/Jakarta'
 const NOW = new Date('2026-09-30T03:00:00Z')
@@ -40,18 +40,18 @@ test('/remind terjadwal: <hari> <jam,jam> <teks>', () => {
   assert.match(parseCommand('/remind senin-jumat absen', NOW, TZ).error, /Jam tidak dikenali/)
   assert.match(parseCommand('/remind senin-jumat 07:20,17:00', NOW, TZ).error, /kosong/)
   assert.match(parseCommand('/remind senin-jumat 25:00 x', NOW, TZ).error, /Jam tidak dikenali/)
-  // format lama tetap jalan
   assert.equal(parseCommand('/remind besok 09:00 x', NOW, TZ).intent.repeat, 'none')
 })
 
-test('/remind terjadwal: toleran terhadap autocorrect keyboard HP', () => {
+test('/remind terjadwal: format yang diketik pengguna dan autocorrect keyboard HP', () => {
   const variants = [
-    '/remind senin\u2013jumat 07:20,17:00 absen', // en dash
-    '/remind senin\u2014jumat 07:20,17:00 absen', // em dash
+    '/remind senin-jumat 07:20-17:00 absen',
+    '/remind senin–jumat 07:20,17:00 absen',
+    '/remind senin—jumat 07:20,17:00 absen',
     '/remind Senin - Jumat 07:20,17:00 absen',
-    '/remind senin sampai jumat 07:20,17:00 absen',
+    '/remind senin sampai jumat 07:20 dan 17:00 absen',
     '/remind senin s/d jumat 07:20, 17:00 absen',
-    '/remind senin-jumat 07:20\u201317:00 absen' // en dash di antara jam
+    '/remind senin-jumat 07:20–17:00 absen'
   ]
   for (const v of variants) {
     const r = parseCommand(v, NOW, TZ)
@@ -59,11 +59,21 @@ test('/remind terjadwal: toleran terhadap autocorrect keyboard HP', () => {
     assert.deepEqual(r.intent.schedule, { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] })
     assert.equal(r.intent.text, 'absen')
   }
-  // Teks reminder tidak ikut diubah
-  assert.equal(parseCommand('/remind senin-jumat 07:20 absen \u2013 pagi', NOW, TZ).intent.text, 'absen \u2013 pagi')
-  // Format lama tidak terpengaruh
-  assert.equal(parseCommand('/remind 10m tes', NOW, TZ).intent.repeat, 'none')
-  assert.ok(parseCommand('/remind kapan-kapan x', NOW, TZ).error)
+  assert.equal(parseCommand('/remind senin-jumat 07:20 absen – pagi', NOW, TZ).intent.text, 'absen – pagi')
+  assert.deepEqual(parseCommand('/remind sabtu,minggu 08:00 siram', NOW, TZ).intent.schedule.days, [6, 7])
+})
+
+test('/help memuat semua perintah dan contoh reminder terjadwal', () => {
+  assert.equal(parseCommand('/help', NOW, TZ).intent.action, 'help')
+  for (const cmd of ['/note', '/notes', '/cari', '/remind', '/reminders', '/done', '/del']) {
+    assert.ok(HELP_TEXT.includes(cmd), `${cmd} tidak ada di /help`)
+  }
+  assert.match(HELP_TEXT, /\/remind senin-jumat 07:20,17:00 absen/)
+  assert.match(HELP_TEXT, /Format hari/)
+  // Setiap contoh /remind di bantuan harus benar-benar bisa diparse.
+  for (const line of HELP_TEXT.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('/remind ') && !l.includes('<'))) {
+    assert.ok(parseCommand(line, NOW, TZ).intent, `contoh di /help gagal: ${line}`)
+  }
 })
 
 test('/done, /del, perintah tak dikenal', () => {

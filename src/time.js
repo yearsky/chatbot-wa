@@ -205,6 +205,46 @@ export function formatDateTime(date, tz) {
   }).format(date)
 }
 
+// "15.17"
+export function formatClock(date, tz) {
+  const p = getZonedParts(date, tz)
+  return `${String(p.hour).padStart(2, '0')}.${String(p.minute).padStart(2, '0')}`
+}
+
+// "2 menit", "1 jam 30 menit", "3 hari"
+export function formatDuration(ms) {
+  const totalMin = Math.max(1, Math.round(ms / 60000))
+  const days = Math.floor(totalMin / 1440)
+  const hours = Math.floor((totalMin % 1440) / 60)
+  const minutes = totalMin % 60
+  if (days) return hours ? `${days} hari ${hours} jam` : `${days} hari`
+  if (hours) return minutes ? `${hours} jam ${minutes} menit` : `${hours} jam`
+  return `${minutes} menit`
+}
+
+function localDayNumber(date, tz) {
+  const p = getZonedParts(date, tz)
+  return Date.UTC(p.year, p.month - 1, p.day) / DAY_MS
+}
+
+// Keterangan waktu relatif terhadap sekarang: "pukul 15.17", "besok pukul 09.00", "Kam, 8 Okt pukul 09.00".
+export function formatWhen(date, now, tz) {
+  const clock = `pukul ${formatClock(date, tz)}`
+  const dayDiff = localDayNumber(date, tz) - localDayNumber(now, tz)
+  if (dayDiff === 0) return clock
+  if (dayDiff === 1) return `besok ${clock}`
+  if (dayDiff === 2) return `lusa ${clock}`
+  const sameYear = getZonedParts(date, tz).year === getZonedParts(now, tz).year
+  const day = new Intl.DateTimeFormat('id-ID', {
+    timeZone: tz,
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(sameYear ? {} : { year: 'numeric' })
+  }).format(date)
+  return `${day} ${clock}`
+}
+
 // ISO 8601 dengan offset lokal, mis. 2026-09-30T14:05:00+07:00 (untuk prompt AI).
 export function toLocalIso(date, tz) {
   const p = getZonedParts(date, tz)

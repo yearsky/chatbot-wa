@@ -4,7 +4,7 @@
 import fs from 'node:fs'
 import chalk from 'chalk'
 import dotenv from 'dotenv'
-import { PROVIDERS, createAi } from './ai/index.js'
+import { PROVIDERS, createAi, createMcp } from './ai/index.js'
 import { createAssistant } from './assistant.js'
 import { PATHS, loadConfig } from './config.js'
 import { Store } from './db.js'
@@ -48,22 +48,40 @@ if (!config.ownerNumber) {
 
 console.log(chalk.cyan.bold('\n🤖 Asisten Pribadi WhatsApp'))
 console.log(chalk.gray(`   AI      : ${PROVIDERS[config.provider] || config.provider}${config.model ? ` · model ${config.model}` : ''}`))
-console.log(chalk.gray(`   Pemilik : ${config.ownerNumber}`))
+console.log(chalk.gray(`   Pemilik : ${config.ownerNumber}${config.ownerName ? ` (${config.ownerName})` : ''}`))
 console.log(chalk.gray(`   Zona    : ${config.timezone}`))
-console.log(chalk.gray(`   Data    : ${PATHS.db}`))
+console.log(chalk.gray(`   Data    : ${PATHS.db} (SQLite)`))
 console.log(chalk.gray('   Ubah pengaturan: npm run setup · Berhenti: Ctrl+C\n'))
 
 fs.mkdirSync(PATHS.data, { recursive: true })
-const store = new Store(PATHS.db)
+const store = new Store(PATHS.db, { legacyJson: PATHS.legacyDb })
+if (store.migrated) log('success', `${store.migrated} catatan/reminder lama dipindahkan dari db.json ke SQLite.`)
+log('info', `Memory bank: ${store.countNotes()} catatan, ${store.listReminders().length} reminder aktif.`)
 
 let ai = null
 try {
-  ai = createAi(config, { cwd: PATHS.data })
+  ai = createAi(config, { cwd: PATHS.data, log })
+  if (ai?.warm) {
+    log('info', 'Menyiapkan Claude di latar belakang (supaya balasan cepat)...')
+    ai.warm()
+  }
 } catch (err) {
   log('warn', `AI tidak aktif: ${err.message}`)
 }
 
-const assistant = createAssistant({ store, ai, tz: config.timezone, log })
+const mcpRunner = createMcp(config, { cwd: PATHS.data, log })
+const mcpNames = Object.keys(config.mcpCommands || {})
+if (mcpRunner) log('info', `Perintah MCP aktif: ${mcpNames.map((n) => '/' + n).join(', ')}`)
+
+const assistant = createAssistant({
+  store,
+  ai,
+  tz: config.timezone,
+  ownerName: config.ownerName,
+  mcpCommands: config.mcpCommands,
+  mcpRunner,
+  log
+})
 
 const wa = startWhatsApp({
   authDir: PATHS.auth,
@@ -74,7 +92,12 @@ const wa = startWhatsApp({
     await wa.typing(chatJid, true)
     let reply
     try {
-      reply = await assistant.handle(text)
+      reply = await assistant.handle(text, {
+        notify: async (t) => {
+          await wa.sendText(chatJid, t, msg)
+          await wa.typing(chatJid, true)
+        }
+      })
     } finally {
       await wa.typing(chatJid, false)
     }
@@ -83,7 +106,13 @@ const wa = startWhatsApp({
   }
 })
 
-const scheduler = createScheduler({ store, tz: config.timezone, log, send: (text) => wa.sendToOwner(text) })
+const scheduler = createScheduler({
+  store,
+  tz: config.timezone,
+  ownerName: config.ownerName,
+  log,
+  send: (text) => wa.sendToOwner(text)
+})
 
 wa.start()
 scheduler.start()
@@ -91,7 +120,9 @@ scheduler.start()
 async function shutdown() {
   log('info', 'Mematikan bot...')
   scheduler.stop()
+  ai?.close?.()
   await wa.stop()
+  store.close()
   process.exit(0)
 }
 process.on('SIGINT', shutdown)

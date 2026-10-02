@@ -1,11 +1,22 @@
 // Loop pengecekan reminder jatuh tempo. Reminder disimpan di file, jadi tetap aman setelah restart;
 // reminder yang terlewat saat komputer mati dikirim ketika bot hidup lagi dengan label "terlambat".
 
-import { formatDateTime } from './time.js'
+import { formatWhen } from './time.js'
 
 const LATE_THRESHOLD_MS = 5 * 60 * 1000
 
-export function createScheduler({ store, send, tz, log = () => {}, clock = () => new Date(), intervalMs = 30000 }) {
+// "Hii Kai, aku mau remind minum air jangan lupa ya"
+export function reminderMessage(r, now, tz, ownerName = '') {
+  const due = new Date(r.dueAt)
+  let msg = `Hii${ownerName ? ` ${ownerName}` : ''}, aku mau remind ${r.text} jangan lupa ya`
+  if (now.getTime() - due.getTime() > LATE_THRESHOLD_MS) {
+    msg += `\n_(harusnya ${formatWhen(due, now, tz)}, maaf telat karena bot sempat mati)_`
+  }
+  if (r.repeat !== 'none') msg += `\n_Balas /done ${r.id} kalau sudah tidak perlu diingatkan lagi._`
+  return msg
+}
+
+export function createScheduler({ store, send, tz, ownerName = '', log = () => {}, clock = () => new Date(), intervalMs = 30000 }) {
   let timer = null
   let running = false
 
@@ -15,11 +26,7 @@ export function createScheduler({ store, send, tz, log = () => {}, clock = () =>
     try {
       const now = clock()
       for (const r of store.dueReminders(now)) {
-        const due = new Date(r.dueAt)
-        const late = now.getTime() - due.getTime() > LATE_THRESHOLD_MS
-        const text =
-          `⏰ *Reminder*${late ? ` (terlambat, jadwal ${formatDateTime(due, tz)})` : ''}\n` +
-          `${r.text}\n\n_#${r.id}${r.repeat !== 'none' ? ' · balas /done ' + r.id + ' untuk menghentikan' : ''}_`
+        const text = reminderMessage(r, now, tz, ownerName)
         try {
           await send(text)
         } catch (err) {
