@@ -4,6 +4,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { nextOccurrence } from './time.js'
+import { nextScheduledOccurrence } from './schedule.js'
 
 const EMPTY = () => ({ nextId: 1, notes: [], reminders: [] })
 
@@ -51,12 +52,14 @@ export class Store {
     return [...this.data.notes]
   }
 
-  addReminder(text, dueAt, repeat = 'none', now = new Date()) {
+  // repeat 'schedule' butuh `schedule` = { days, times } (lihat schedule.js).
+  addReminder(text, dueAt, repeat = 'none', now = new Date(), schedule = null) {
     const reminder = {
       id: this.#id(),
       text,
       dueAt: dueAt.toISOString(),
       repeat,
+      ...(repeat === 'schedule' && { schedule }),
       status: 'pending',
       createdAt: now.toISOString()
     }
@@ -105,7 +108,11 @@ export class Store {
   afterFire(id, now, tz) {
     const reminder = this.data.reminders.find((r) => r.id === id)
     if (!reminder) return null
-    const next = nextOccurrence(new Date(reminder.dueAt), reminder.repeat, now, tz)
+    // Jadwal berikutnya dihitung dari `now`, jadi jadwal yang terlewat saat bot mati tidak dikirim beruntun.
+    const next =
+      reminder.repeat === 'schedule'
+        ? nextScheduledOccurrence(reminder.schedule, now, tz)
+        : nextOccurrence(new Date(reminder.dueAt), reminder.repeat, now, tz)
     if (next) {
       reminder.dueAt = next.toISOString()
     } else {

@@ -1,6 +1,6 @@
 # Planning: Reminder Terjadwal (Loop Hari & Jam)
 
-Status: **draft planning**, belum diimplementasi.
+Status: **sudah diimplementasi** (versi pertama). Kode utama ada di `src/schedule.js`.
 
 ## 1. Tujuan
 
@@ -207,9 +207,11 @@ Kasus lain:
 - **Tanggal berakhir**: `... sampai 31/12`.
 - **Pesan berbeda per jam dalam satu reminder.** Untuk sekarang cukup memakai dua reminder.
 
-## 7. Pertanyaan terbuka
+## 7. Keputusan
 
-1. ~~**Interpretasi jam.**~~ ✅ **Diputuskan:** "jam 7.20 dan sore 17.00" berarti **dua kiriman per hari** (07:20 dan 17:00), bukan kiriman berulang tiap N menit di antara kedua jam itu. Mode interval tetap di fase 2.
-2. **Isi pesan pagi & sore**: sama (satu reminder) atau berbeda (dua reminder)? Keduanya didukung oleh desain ini.
-3. **Batas keterlambatan**: kalau bot baru nyala jauh setelah jadwal, apakah reminder tetap dikirim dengan label "terlambat" (perilaku sekarang) atau dilewati bila terlambat lebih dari, misalnya, 60 menit?
-4. **Hari libur nasional**: perlu di versi pertama, atau cukup `/skip` manual nanti?
+1. **Interpretasi jam:** "jam 7.20 dan sore 17.00" berarti **dua kiriman per hari** (07:20 dan 17:00), bukan kiriman berulang tiap N menit. Mode interval tetap di fase 2.
+2. **Format perintah:** `/remind senin-jumat <jam,jam> <teks>`. Jam boleh dipisah `,`, `-` atau `dan`; `07:20-17:00` juga dibaca sebagai dua kiriman. Pesan pagi dan sore yang berbeda dibuat sebagai dua reminder.
+3. **Keterlambatan:** tetap dikirim dengan label "terlambat" (perilaku yang sudah ada). Hanya satu kiriman terlambat, lalu jadwal dihitung dari waktu sekarang.
+4. **Hari libur nasional:** tidak diperlukan.
+
+Catatan implementasi: satu hari saja (mis. `/remind senin 08:00 rapat`) juga dibaca sebagai jadwal **berulang** setiap Senin. Balasan konfirmasi menampilkan tanda 🔁 agar jelas.

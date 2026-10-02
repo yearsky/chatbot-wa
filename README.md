@@ -66,6 +66,8 @@ Jika bot login di **nomormu sendiri**, pakai chat **"Kirim pesan ke diri sendiri
 /remind 5/10 14:00 rapat
 /remind harian 07:00 minum obat
 /remind mingguan besok 08:00 kerja bakti
+/remind senin-jumat 07:20,17:00 absen   → tiap Senin–Jumat jam 07:20 & 17:00
+/remind weekend 08:00 siram tanaman
 /reminders                    → lihat reminder aktif
 /done 3                       → hentikan/selesaikan reminder #3
 /del 2                        → hapus catatan/reminder #2
@@ -73,6 +75,20 @@ Jika bot login di **nomormu sendiri**, pakai chat **"Kirim pesan ke diri sendiri
 ```
 
 Format waktu: `10m`, `2h`, `1h30m`, `1d`, `07:00`, `besok 09:00`, `lusa 8.30`, `5/10 14:00`, `2026-10-05 14:00`.
+
+### Reminder terjadwal (hari & jam tetap)
+
+Format: `/remind <hari> <jam,jam,...> <teks>`
+
+- **Hari**: `senin-jumat`, `sen-jum`, `hari-kerja`, `weekend`, `setiap-hari`, `senin,rabu,jumat`, atau satu hari (`senin`). Rentang boleh melewati Minggu, mis. `jumat-senin`.
+- **Jam**: satu atau beberapa jam, dipisah `,`, `-` atau `dan`. Contoh `07:20,17:00` atau `7.20-17.00`. Keduanya berarti **dua kiriman** (07:20 dan 17:00), bukan kiriman berulang di antara dua jam itu.
+- Satu reminder = satu ID untuk semua jam. `/done <id>` menghentikan seluruh jadwal.
+- Jika pesan pagi dan sore berbeda, buat dua reminder:
+  ```
+  /remind senin-jumat 07:20 absen masuk
+  /remind senin-jumat 17:00 absen pulang
+  ```
+- Lewat AI juga bisa: *"ingatkan aku absen tiap senin sampai jumat jam 7.20 dan jam 5 sore"*.
 
 ### Bahasa bebas (pakai AI)
 
@@ -87,7 +103,7 @@ AI hanya menerjemahkan pesan menjadi aksi (JSON). Penyimpanan dan penjadwalan di
 
 ## Supaya jalan 24/7 di komputer sendiri
 
-- Reminder hanya terkirim saat bot menyala. Jika komputer mati, reminder yang terlewat dikirim saat bot dinyalakan lagi (ditandai "terlambat").
+- Reminder hanya terkirim saat bot menyala. Jika komputer mati, reminder yang terlewat dikirim saat bot dinyalakan lagi (ditandai "terlambat"). Untuk reminder berulang/terjadwal, hanya **satu** kiriman terlambat yang dikirim, lalu jadwal lanjut ke jam berikutnya.
 - Matikan mode sleep: **Settings → System → Power → Screen and sleep → Never** (Windows).
 - Agar otomatis jalan saat login Windows, buat file `start-bot.bat`:
   ```bat
@@ -107,6 +123,7 @@ src/wa.js          koneksi WhatsApp (Baileys), QR, filter pemilik
 src/assistant.js   router perintah / AI
 src/commands.js    parser perintah /...
 src/scheduler.js   pengirim reminder
+src/schedule.js    jadwal hari & jam (senin-jumat 07:20,17:00)
 src/db.js          penyimpanan JSON
 src/time.js        parsing & format waktu
 src/ai/            provider: claudeCli, codexCli, openaiApi

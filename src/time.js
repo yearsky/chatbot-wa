@@ -104,7 +104,7 @@ function parseDuration(token) {
   return consumed === token.length && total > 0 ? total : null
 }
 
-function parseClock(token) {
+export function parseClock(token) {
   const m = /^(\d{1,2})[:.](\d{2})$/.exec(token)
   if (!m) return null
   const hour = Number(m[1])
