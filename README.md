@@ -80,7 +80,7 @@ Format waktu: `10m`, `2h`, `1h30m`, `1d`, `07:00`, `besok 09:00`, `lusa 8.30`, `
 
 Format: `/remind <hari> <jam,jam,...> <teks>`
 
-- **Hari**: `senin-jumat`, `sen-jum`, `hari-kerja`, `weekend`, `setiap-hari`, `senin,rabu,jumat`, atau satu hari (`senin`). Rentang boleh melewati Minggu, mis. `jumat-senin`.
+- **Hari**: `senin-jumat`, `sen-jum`, `hari-kerja`, `weekend`, `setiap-hari`, `senin,rabu,jumat`, atau satu hari (`senin`). Rentang boleh melewati Minggu, mis. `jumat-senin`. Penulisan `senin - jumat`, `senin – jumat` (strip dari autocorrect HP) dan `senin sampai jumat` juga diterima.
 - **Jam**: satu atau beberapa jam, dipisah `,`, `-` atau `dan`. Contoh `07:20,17:00` atau `7.20-17.00`. Keduanya berarti **dua kiriman** (07:20 dan 17:00), bukan kiriman berulang di antara dua jam itu.
 - Satu reminder = satu ID untuk semua jam. `/done <id>` menghentikan seluruh jadwal.
 - Jika pesan pagi dan sore berbeda, buat dua reminder:

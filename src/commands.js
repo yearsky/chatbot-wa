@@ -2,7 +2,7 @@
 // sehingga eksekusinya bisa dipakai bersama di assistant.js.
 
 import { parseWhen } from './time.js'
-import { nextScheduledOccurrence, parseDays, parseTimesPrefix } from './schedule.js'
+import { nextScheduledOccurrence, normalizeDayRange, parseDays, parseTimesPrefix } from './schedule.js'
 
 export const HELP_TEXT = `*Asisten Pribadi* 🤖
 
@@ -71,9 +71,10 @@ export function parseCommand(text, now, tz) {
       const [first, ...others] = rest.split(/\s+/)
 
       // Reminder terjadwal: /remind senin-jumat 07:20,17:00 absen
-      const days = parseDays(first)
+      const [dayToken, ...afterDays] = normalizeDayRange(rest).split(/\s+/)
+      const days = parseDays(dayToken)
       if (days) {
-        const parsedTimes = parseTimesPrefix(others.join(' '))
+        const parsedTimes = parseTimesPrefix(afterDays.join(' '))
         if (!parsedTimes) {
           return { error: 'Jam tidak dikenali. Contoh: /remind senin-jumat 07:20,17:00 absen' }
         }
