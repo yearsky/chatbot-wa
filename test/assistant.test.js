@@ -76,6 +76,43 @@ test('scheduler mengirim reminder jatuh tempo dan mencoba ulang bila gagal', asy
   assert.equal(store.listReminders().length, 1) // yang harian dijadwalkan ulang
 })
 
+test('reminder terjadwal: perintah, AI, daftar, dan scheduler', async () => {
+  const store = new Store(null)
+  let now = NOW // Rabu 30 Sep 2026 10:00 WIB
+  const a = createAssistant({ store, ai: null, tz: TZ, clock: () => now })
+  const reply = await a.handle('/remind senin-jumat 07:20,17:00 absen')
+  assert.match(reply, /Sen–Jum jam 07:20 & 17:00/)
+  assert.match(reply, /Kiriman pertama: Rab, 30 Sep 2026, 17\.00/)
+  assert.match(await a.handle('/reminders'), /#1 · .* 🔁 Sen–Jum jam 07:20 & 17:00\n {4}absen/)
+
+  const viaAi = createAssistant({
+    store,
+    ai: fakeAi('{"action":"add_reminder","text":"olahraga","due_at":null,"repeat":"schedule","days":[1,3,5],"times":["06:00"]}'),
+    tz: TZ,
+    clock: () => now
+  })
+  assert.match(await viaAi.handle('ingatkan olahraga tiap senin rabu jumat jam 6'), /Sen, Rab, Jum jam 06:00/)
+
+  const sent = []
+  const sched = createScheduler({ store, tz: TZ, clock: () => now, send: async (t) => sent.push(t) })
+  now = new Date('2026-09-30T10:00:10Z') // 17:00:10 WIB
+  await sched.tick()
+  assert.equal(sent.length, 1)
+  assert.doesNotMatch(sent[0], /terlambat/)
+  assert.match(sent[0], /absen[\s\S]*\/done 1/)
+  assert.equal(store.find(1).item.dueAt, '2026-10-01T00:20:00.000Z') // Kamis 07:20 WIB
+
+  // Bot mati dari Kamis pagi sampai Kamis 12:00 → satu kiriman terlambat, lalu Kamis 17:00
+  now = new Date('2026-10-01T05:00:00Z')
+  await sched.tick()
+  assert.equal(sent.length, 2)
+  assert.match(sent[1], /terlambat, jadwal Kam, 1 Okt 2026, 07\.20/)
+  assert.equal(store.find(1).item.dueAt, '2026-10-01T10:00:00.000Z')
+
+  assert.match(await a.handle('/done 1'), /selesai: absen/)
+  assert.equal(store.listReminders().filter((r) => r.id === 1).length, 0)
+})
+
 test('Claude CLI provider (binary palsu)', { skip: process.platform === 'win32' }, async () => {
   const ai = createClaudeCli({ bin: path.join(FIX, 'fake-claude.js'), model: 'haiku', timeoutMs: 10000 })
   const out = await ai.complete('tolong catat beli susu')

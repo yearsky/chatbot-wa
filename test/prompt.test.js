@@ -38,6 +38,35 @@ test('validateIntent', () => {
   assert.equal(validateIntent({ action: 'done', id: null }, NOW).ok, false)
 })
 
+test('validateIntent: repeat schedule dihitung oleh kode, bukan due_at dari AI', () => {
+  const raw = {
+    action: 'add_reminder',
+    text: 'absen',
+    due_at: '2020-01-01T00:00:00Z', // diabaikan
+    repeat: 'schedule',
+    days: [1, 2, 3, 4, 5],
+    times: ['17:00', '07:20']
+  }
+  const ok = validateIntent(raw, NOW, 'Asia/Jakarta')
+  assert.equal(ok.ok, true)
+  assert.deepEqual(ok.intent.schedule, { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] })
+  assert.equal(ok.intent.dueAt.toISOString(), '2026-09-30T10:00:00.000Z') // Rabu 17:00 WIB
+
+  assert.equal(validateIntent({ ...raw, days: [8] }, NOW, 'Asia/Jakarta').ok, false)
+  assert.equal(validateIntent({ ...raw, times: ['pagi'] }, NOW, 'Asia/Jakarta').ok, false)
+  assert.equal(validateIntent({ ...raw, text: '' }, NOW, 'Asia/Jakarta').ok, false)
+})
+
+test('buildPrompt menampilkan jadwal reminder', () => {
+  const p = buildPrompt({
+    message: 'x',
+    now: NOW,
+    tz: 'Asia/Jakarta',
+    reminders: [{ id: 3, text: 'absen', dueAt: '2026-09-30T10:00:00Z', repeat: 'schedule', schedule: { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] } }]
+  })
+  assert.match(p, /#3: absen @ 2026-09-30T17:00:00\+07:00 \(jadwal Sen–Jum jam 07:20 & 17:00\)/)
+})
+
 test('parseClaudeOutput', () => {
   assert.equal(parseClaudeOutput('{"type":"result","is_error":false,"result":"{\\"ok\\":true}"}'), '{"ok":true}')
   assert.throws(() => parseClaudeOutput('{"is_error":true,"result":"limit"}'), /limit/)

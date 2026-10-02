@@ -1,6 +1,7 @@
 // Prompt untuk mengubah pesan bahasa natural menjadi aksi JSON, plus validasinya.
 // AI hanya menerjemahkan; eksekusi tetap dilakukan oleh kode (lihat assistant.js).
 
+import { formatSchedule, nextScheduledOccurrence, normalizeSchedule } from '../schedule.js'
 import { toLocalIso } from '../time.js'
 
 export const ACTIONS = [
@@ -12,9 +13,14 @@ export const ACTIONS = [
   'done',
   'chat'
 ]
-export const REPEATS = ['none', 'daily', 'weekly']
+export const REPEATS = ['none', 'daily', 'weekly', 'schedule']
 
 const MAX_CONTEXT_ITEMS = 30
+
+function repeatNote(r) {
+  if (r.repeat === 'schedule' && r.schedule) return ` (jadwal ${formatSchedule(r.schedule)})`
+  return r.repeat !== 'none' ? ` (${r.repeat})` : ''
+}
 
 export function buildPrompt({ message, now, tz, notes = [], reminders = [] }) {
   const noteLines = notes
@@ -23,7 +29,7 @@ export function buildPrompt({ message, now, tz, notes = [], reminders = [] }) {
     .join('\n')
   const reminderLines = reminders
     .slice(0, MAX_CONTEXT_ITEMS)
-    .map((r) => `#${r.id}: ${r.text} @ ${toLocalIso(new Date(r.dueAt), tz)}${r.repeat !== 'none' ? ` (${r.repeat})` : ''}`)
+    .map((r) => `#${r.id}: ${r.text} @ ${toLocalIso(new Date(r.dueAt), tz)}${repeatNote(r)}`)
     .join('\n')
 
   return `Kamu adalah asisten pribadi di WhatsApp yang mengelola CATATAN dan REMINDER milik pemilik.
@@ -35,14 +41,19 @@ Skema JSON:
 {
   "action": "add_note" | "list_notes" | "add_reminder" | "list_reminders" | "delete" | "done" | "chat",
   "text": string,          // isi catatan/reminder (ringkas, tanpa kata "ingatkan"), kosongkan jika tidak perlu
-  "due_at": string | null, // hanya untuk add_reminder: ISO 8601 LENGKAP dengan offset zona waktu, harus di masa depan
-  "repeat": "none" | "daily" | "weekly",
+  "due_at": string | null, // hanya untuk add_reminder: ISO 8601 LENGKAP dengan offset zona waktu, harus di masa depan; null jika repeat "schedule"
+  "repeat": "none" | "daily" | "weekly" | "schedule",
+  "days": number[] | null,  // hanya untuk repeat "schedule": hari, 1=Senin ... 7=Minggu
+  "times": string[] | null, // hanya untuk repeat "schedule": jam "HH:MM" 24 jam, mis. ["07:20","17:00"]
   "id": number | null,     // untuk delete/done: ID item dari daftar di bawah
   "reply": string          // balasan singkat & ramah dalam bahasa pengguna
 }
 
 Aturan:
 - "ingatkan/remind/jangan lupa ... <waktu>" → add_reminder. Jika jam tidak disebut untuk hari tertentu, pakai 09:00.
+- Reminder berulang pada hari tertentu dan/atau beberapa jam per hari (mis. "tiap senin sampai jumat jam 7.20 dan jam 5 sore",
+  "setiap hari jam 8 dan jam 20") → add_reminder dengan repeat "schedule", isi "days" dan "times", dan "due_at": null.
+  "sore/malam" berarti jam 12–23 (jam 5 sore = 17:00).
 - "catat/simpan/note ..." → add_note.
 - Pertanyaan tentang daftar catatan/reminder → list_notes / list_reminders.
 - "hapus ..." → delete dengan id yang paling cocok; "sudah/selesai ..." → done dengan id reminder yang cocok.
@@ -91,7 +102,7 @@ function toId(value) {
 }
 
 // Validasi & normalisasi intent. Mengembalikan { ok: true, intent } atau { ok: false, error }.
-export function validateIntent(raw, now) {
+export function validateIntent(raw, now, tz) {
   if (!raw || typeof raw !== 'object') return { ok: false, error: 'Format jawaban AI tidak valid' }
   const action = raw.action
   if (!ACTIONS.includes(action)) return { ok: false, error: `Aksi tidak dikenal: ${action}` }
@@ -106,7 +117,14 @@ export function validateIntent(raw, now) {
   }
 
   if (action === 'add_note' && !intent.text) return { ok: false, error: 'Isi catatan kosong' }
-  if (action === 'add_reminder') {
+  if (action === 'add_reminder' && intent.repeat === 'schedule') {
+    if (!intent.text) return { ok: false, error: 'Isi reminder kosong' }
+    // Untuk jadwal, waktu kirim dihitung oleh kode, bukan diambil dari AI.
+    const schedule = normalizeSchedule({ days: raw.days, times: raw.times })
+    if (!schedule || !tz) return { ok: false, error: 'Jadwal reminder tidak valid' }
+    intent.schedule = schedule
+    intent.dueAt = nextScheduledOccurrence(schedule, now, tz)
+  } else if (action === 'add_reminder') {
     if (!intent.text) return { ok: false, error: 'Isi reminder kosong' }
     const due = raw.due_at ? new Date(raw.due_at) : null
     if (!due || Number.isNaN(due.getTime())) return { ok: false, error: 'Waktu reminder tidak valid' }

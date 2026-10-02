@@ -44,3 +44,24 @@ test('remove, markDone, dueReminders, afterFire', () => {
   assert.equal(s.remove(daily.id).type, 'reminder')
   assert.equal(s.remove(999), null)
 })
+
+test('reminder terjadwal tersimpan dan maju ke jadwal berikutnya', () => {
+  const { file } = tempStore()
+  const s = new Store(file)
+  const schedule = { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] }
+  // Jumat 2 Okt 2026 17:00 WIB
+  const r = s.addReminder('absen', new Date('2026-10-02T10:00:00Z'), 'schedule', new Date(), schedule)
+  assert.deepEqual(new Store(file).find(r.id).item.schedule, schedule)
+
+  // Terkirim tepat waktu → Senin 07:20 WIB
+  s.afterFire(r.id, new Date('2026-10-02T10:00:20Z'), TZ)
+  assert.equal(s.find(r.id).item.dueAt, '2026-10-05T00:20:00.000Z')
+  assert.equal(s.find(r.id).item.status, 'pending')
+
+  // Bot mati sampai Senin 09:00 → kirim sekali (terlambat), lalu lanjut Senin 17:00
+  s.afterFire(r.id, new Date('2026-10-05T02:00:00Z'), TZ)
+  assert.equal(s.find(r.id).item.dueAt, '2026-10-05T10:00:00.000Z')
+
+  // Reminder biasa tidak membawa field schedule
+  assert.equal('schedule' in s.addReminder('x', new Date('2026-10-10T00:00:00Z')), false)
+})

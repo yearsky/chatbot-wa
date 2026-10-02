@@ -2,6 +2,7 @@
 // sehingga eksekusinya bisa dipakai bersama di assistant.js.
 
 import { parseWhen } from './time.js'
+import { nextScheduledOccurrence, parseDays, parseTimesPrefix } from './schedule.js'
 
 export const HELP_TEXT = `*Asisten Pribadi* 🤖
 
@@ -13,6 +14,8 @@ export const HELP_TEXT = `*Asisten Pribadi* 🤖
 /remind <waktu> <teks> — buat reminder
 /remind harian <jam> <teks> — reminder setiap hari
 /remind mingguan <waktu> <teks> — reminder setiap minggu
+/remind <hari> <jam,jam> <teks> — reminder terjadwal, mis.
+   /remind senin-jumat 07:20,17:00 absen
 /reminders — lihat reminder aktif
 /done <id> — tandai reminder selesai
 
@@ -22,6 +25,9 @@ export const HELP_TEXT = `*Asisten Pribadi* 🤖
 
 *Format waktu*
 10m · 2h · 1h30m · 1d · 07:00 · besok 09:00 · lusa 8.30 · 5/10 14:00 · 2026-10-05 14:00
+
+*Format hari*
+senin-jumat · sen-jum · hari-kerja · weekend · setiap-hari · senin,rabu,jumat
 
 Tanpa "/" pesanmu dibaca oleh AI (jika diaktifkan), contoh:
 "ingatkan aku besok jam 7 pagi olahraga"`
@@ -62,9 +68,23 @@ export function parseCommand(text, now, tz) {
     case 'remind':
     case 'ingatkan': {
       if (!rest) return { error: 'Format: /remind <waktu> <teks>\nContoh: /remind 30m angkat jemuran' }
+      const [first, ...others] = rest.split(/\s+/)
+
+      // Reminder terjadwal: /remind senin-jumat 07:20,17:00 absen
+      const days = parseDays(first)
+      if (days) {
+        const parsedTimes = parseTimesPrefix(others.join(' '))
+        if (!parsedTimes) {
+          return { error: 'Jam tidak dikenali. Contoh: /remind senin-jumat 07:20,17:00 absen' }
+        }
+        if (!parsedTimes.rest) return { error: 'Isi reminder kosong. Contoh: /remind senin-jumat 07:20,17:00 absen' }
+        const schedule = { days, times: parsedTimes.times }
+        const dueAt = nextScheduledOccurrence(schedule, now, tz)
+        return { intent: { action: 'add_reminder', text: parsedTimes.rest, dueAt, repeat: 'schedule', schedule } }
+      }
+
       let repeat = 'none'
       let body = rest
-      const [first, ...others] = rest.split(/\s+/)
       if (REPEAT_WORDS[first.toLowerCase()]) {
         repeat = REPEAT_WORDS[first.toLowerCase()]
         body = others.join(' ')

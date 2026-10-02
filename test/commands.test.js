@@ -25,6 +25,25 @@ test('/remind dengan repeat', () => {
   assert.ok(parseCommand('/remind kapan-kapan x', NOW, TZ).error)
 })
 
+test('/remind terjadwal: <hari> <jam,jam> <teks>', () => {
+  // NOW = Rabu 30 Sep 2026 10:00 WIB
+  const r = parseCommand('/remind senin-jumat 07:20,17:00 absen', NOW, TZ).intent
+  assert.equal(r.action, 'add_reminder')
+  assert.equal(r.repeat, 'schedule')
+  assert.deepEqual(r.schedule, { days: [1, 2, 3, 4, 5], times: ['07:20', '17:00'] })
+  assert.equal(r.text, 'absen')
+  assert.equal(r.dueAt.toISOString(), '2026-09-30T10:00:00.000Z') // hari ini 17:00 WIB
+
+  const w = parseCommand('/remind weekend 08:00 siram tanaman', NOW, TZ).intent
+  assert.equal(w.dueAt.toISOString(), '2026-10-03T01:00:00.000Z') // Sabtu 08:00 WIB
+
+  assert.match(parseCommand('/remind senin-jumat absen', NOW, TZ).error, /Jam tidak dikenali/)
+  assert.match(parseCommand('/remind senin-jumat 07:20,17:00', NOW, TZ).error, /kosong/)
+  assert.match(parseCommand('/remind senin-jumat 25:00 x', NOW, TZ).error, /Jam tidak dikenali/)
+  // format lama tetap jalan
+  assert.equal(parseCommand('/remind besok 09:00 x', NOW, TZ).intent.repeat, 'none')
+})
+
 test('/done, /del, perintah tak dikenal', () => {
   assert.deepEqual(parseCommand('/done #3', NOW, TZ).intent, { action: 'done', id: 3 })
   assert.deepEqual(parseCommand('/del 4', NOW, TZ).intent, { action: 'delete', id: 4 })
